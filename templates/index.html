@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OptimiseIt - Academic Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        .academic-output { font-family: "Times New Roman", Times, serif !important; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.2s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* Dark mode uyumlu Sidebar hover ve active efektleri */
+        .sidebar-item { border-left: 4px solid transparent; transition: all 0.2s; }
+        .sidebar-item:hover { background-color: rgba(30, 41, 59, 0.8); } /* hover: slate-800 */
+        .sidebar-item.active { background-color: rgba(30, 41, 59, 0.9); border-left-color: #3b82f6; color: #60a5fa; font-weight: 600; } /* blue-500, blue-400 */
+        
+        /* Çıktı grafikleri için koyu çerçeve */
+        .result-image { width: 100%; max-height: 500px; object-fit: contain; border-radius: 0; border: 1px solid #334155; margin-top: 1rem; }
+        
+        /* Dark Mode Yükleme Ekranı */
+        #loading-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); z-index: 50; flex-direction: column; justify-content: center; align-items: center; }
+        .spinner { border: 4px solid #334155; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .fade-transition { transition: opacity 0.4s ease-in-out; }
+
+        /* --- DARK MODE ARKA PLAN AYARLARI --- */
+        body {
+            background-color: #0f172a; /* slate-900 - Derin koyu mavi/gri */
+            position: relative;
+            z-index: 0;
+            color: #e2e8f0; /* slate-200 - Genel metin rengi */
+        }
+        
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: url('/static/bg.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            opacity: 0.15;
+            z-index: -1;
+        }
+
+        /* Dark Mode Cam Efekti */
+        .glass-sidebar {
+            background-color: rgba(15, 23, 42, 0.85) !important;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex bg-transparent">
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p class="mt-4 font-semibold text-slate-300">Processing Data...</p>
+    </div>
+
+    <div id="mobile-overlay" class="fixed inset-0 bg-black bg-opacity-60 z-40 hidden md:hidden transition-opacity" onclick="toggleSidebar()"></div>
+
+    <aside id="sidebar" class="w-64 fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 ease-in-out border-r border-slate-700/50 h-full flex flex-col shadow-xl md:shadow-sm z-50 glass-sidebar flex-shrink-0">
+        <div class="p-6 border-b border-slate-700/50 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold text-slate-100 tracking-tight">Optimise<span class="text-blue-500">It</span></h1>
+                <p class="text-xs text-slate-400 mt-1 uppercase tracking-wider font-semibold">Academic Analysis</p>
+            </div>
+            <button onclick="toggleSidebar()" class="md:hidden text-slate-400 hover:text-slate-200">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <nav class="flex-1 py-4 overflow-y-auto">
+            <ul class="space-y-1">
+                <li><button onclick="switchTab('tutorial', this)" class="sidebar-item active w-full text-left px-6 py-3 text-sm text-slate-300">How to Use</button></li>
+                
+                <li><div class="px-6 mt-6 mb-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Models & Tests</div></li>
+                <li><button onclick="switchTab('regression', this)" class="sidebar-item w-full text-left px-6 py-3 text-sm text-slate-300">Curve Fitting (Regression)</button></li>
+                <li><button onclick="switchTab('descriptive', this)" class="sidebar-item w-full text-left px-6 py-3 text-sm text-slate-300">Descriptive Statistics</button></li>
+                <li><button onclick="switchTab('ttest', this)" class="sidebar-item w-full text-left px-6 py-3 text-sm text-slate-300">Independent T-Test</button></li>
+                <li><button onclick="switchTab('correlation', this)" class="sidebar-item w-full text-left px-6 py-3 text-sm text-slate-300">Pearson Correlation</button></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <div class="flex-1 flex flex-col h-full overflow-hidden relative w-full">
+        
+        <header class="md:hidden flex items-center justify-between p-4 glass-sidebar border-b border-slate-700/50 z-30 shadow-sm">
+            <h1 class="text-lg font-bold text-slate-100 tracking-tight">Optimise<span class="text-blue-500">It</span></h1>
+            <button onclick="toggleSidebar()" class="text-slate-300 focus:outline-none">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+        </header>
+
+        <main class="flex-1 h-full overflow-y-auto py-6 md:py-10 bg-transparent">
+            <div class="w-full">
+
+                <div id="tutorial" class="tab-content active bg-slate-800 px-6 md:px-16 py-8 md:py-12 shadow-2xl border-y border-slate-700 rounded-none">
+                    <h2 class="text-2xl font-bold mb-6 text-slate-100">Welcome to OptimiseIt</h2>
+                    <div class="prose max-w-none text-slate-300 space-y-4">
+                        <p>This tool is designed to assist researchers and students in performing standard statistical analysis and curve fitting for academic papers.</p>
+                        <h3 class="text-lg font-bold text-slate-100 mt-6 border-b border-slate-700 pb-2">Data Entry Guidelines</h3>
+                        <ul class="list-disc pl-5 space-y-2">
+                            <li><strong>Format:</strong> All data arrays must be separated by commas. (e.g., <code class="bg-slate-900 px-1 rounded-none border border-slate-700 break-all text-slate-300">12.5, 14.1, 16.0</code>)</li>
+                            <li><strong>Decimals:</strong> Use periods (<code class="bg-slate-900 px-1 rounded-none border border-slate-700 text-slate-300">.</code>) for decimals, not commas.</li>
+                            <li><strong>Equal Lengths:</strong> For Regression, T-Test, and Correlation, ensure both input sets have the exact same number of data points.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div id="regression" class="tab-content">
+                    <div class="bg-slate-800 px-6 md:px-16 py-8 md:py-12 shadow-2xl border-y border-slate-300 rounded-none">
+                        <h2 class="text-xl font-bold mb-6 text-slate-100">Curve Fitting & Regression Model</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mb-6">
+                            <div>
+                                <label class="block text-sm font-semibold mb-2 text-slate-200">Independent Variable (X)</label>
+                                <input type="text" id="reg_x_name" class="w-full border border-slate-600 p-3 mb-2 rounded-none bg-slate-900 text-slate-200 placeholder-slate-500 text-sm fade-transition outline-none focus:ring-1 focus:ring-blue-500">
+                                <textarea id="reg_x" rows="3" class="w-full border border-slate-600 p-3 rounded-none bg-slate-900 text-slate-200 placeholder-slate-500 text-sm font-mono fade-transition outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2 text-slate-200">Dependent Variable (Y)</label>
+                                <input type="text" id="reg_y_name" class="w-full border border-slate-600 p-3 mb-2 rounded-none bg-slate-900 text-slate-200 placeholder-slate-500 text-sm fade-transition outline-none focus:ring-1 focus:ring-blue-500">
+                                <textarea id="reg_y" rows="3" class="w-full border border-slate-600 p-3 rounded-none bg-slate-900 text-slate-200 placeholder-slate-500 text-sm font-mono fade-transition outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+                            </div>
+                        </div>
+                        <button onclick="runAnalysis('regression')" class="w-full bg-blue-600 text-white font-bold py-4 rounded-none hover:bg-blue-500 transition shadow-md">Run Analysis</button>
+                    </div>
+                    
+                    <div id="res_regression" class="mt-8 hidden bg-slate-800 px-6 md:px-16 py-8 md:py-12 shadow-2xl border-y border-slate-300 rounded-none">
+                        <div class="academic-output border-b border-slate-700 pb-4 mb-6">
+                            <h3 class="font-bold text-xl text-slate-100" id="reg_model_name"></h3>
+                            <p class="text-slate-400 mt-2">Coefficient of Determination (R&sup2;): <span id="reg_r2" class="font-bold text-white"></span></p>
+                        </div>
+                        <div class="w-full flex justify-center">
+                            <img id="reg_image" src="" alt="Plot" class="result-image">
+                        </div>
+                        <a id="reg_download" href="#" download="regression_plot.png" class="w-full mt-6 block text-center bg-slate-700 text-slate-100 text-sm font-bold py-4 rounded-none shadow hover:bg-slate-600 transition">Download Chart</a>
+                    </div>
+                </div>
+
+                <div id="descriptive" class="tab-content">
+                    <div class="bg-slate-800 px-6 md:px-16 py-8 md:py-12 shadow-2xl border-y border-slate-300 rounded-none">
+                        <h2 class="text-xl font-bold mb-6 text-slate-100">Descriptive Statistics</h2>
+                        <label class="block text-sm font-semibold mb-2 text-slate-200">Dataset</label>
+                        <textarea id="desc_data" rows="4" class="w-full border border-slate-300 p-3 rounded-none bg-slate-900 text-slate-200 placeholder-slate-500 mb-6 font-mono text-sm fade-transition outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+                        <button onclick="runAnalysis('descriptive')" class="w-full bg-blue-600 text-white font-bold py-4 rounded-none hover:bg-blue-500 transition shadow-md">Calculate</button>
+                    </div>
+                    <div id="res_descriptive" class="mt-8 hidden bg-slate-800 px-6 md:px-16 py-8 md:py-12 shadow-2xl border-y border-slate-300 rounded-none academic-output">
+                        <div id="descriptive_output" class="text-base md:text-lg mb-8 overflow-x-auto text-slate-200"></div>
+                        <div class="w-full flex justify-center">
+                            <img id="descriptive_image" src="" alt="Plot" class="result-image">
+                        </div>
+                        <a id="descriptive_download" href="#" download="boxplot.png" class="w-full mt-6 block text-center bg-slate-700 text-slate-100 text-sm font-bold py-4 rounded-none font-sans shadow hover:bg-slate-600 transition">Download Chart</a>
+                    </div>
+                </div>
+
+                <div id="ttest" class="tab-content">
+                    <div class="bg-slate-800 px-6 md:px-16 py-8 md:py-12 shadow-2xl border-y border-slate-300 rounded-none">
+                        <h2 class="text-xl font-bold mb-6 text-slate-100">Independent Sample T-Test</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mb-6">
+                            <div>
+                                <label class="block text-sm font-semibold mb-2 text-slate-200">Group A Data</label>
+                                <textarea id="ttest_a" rows="4" class="w-full border border-slate-300 p-3 rounded-none bg-slate-900 text-slate-200 placeholder-slate-500 font-mono text-sm fade-transition outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2 text-slate-200">Group B Data</label>
+                                <textarea id="ttest_b" rows="4" class="w-full border border-slate-300 p-3 rounded-none bg-slate-900 text-slate-200 placeholder-slate-500 font-mono text-sm fade-transition outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+                            </div>
+                        </div>
+                        <button onclick="runAnalysis('ttest')" class="w-full bg-blue-600 text-white font-bold py-4 rounded-none hover:bg-blue-500 transition shadow-md">Execute Test</button>
+                    </div>
+                    <div id="res_ttest" class="mt-8 hidden bg-slate-800 px-6 md:px-16 py-8 md:py-12 shadow-2xl border-y border-slate-300 rounded-none academic-output">
+                        <div id="ttest_output" class="text-base md:text-lg mb-8 overflow-x-auto text-slate-200"></div>
+                        <div class="w-full flex justify-center">
+                            <img id="ttest_image" src="" alt="Plot" class="result-image">
+                        </div>
+                        <a id="ttest_download" href="#" download="ttest_bar.png" class="w-full mt-6 block text-center bg-slate-700 text-slate-100 text-sm font-bold py-4 rounded-none font-sans shadow hover:bg-slate-600 transition">Download Chart</a>
+                    </div>
+                </div>
+
+                <div id="correlation" class="tab-content">
+                    <div class="bg-slate-800 px-6 md:px-16 py-8 md:py-12 shadow-2xl border-y border-slate-300 rounded-none">
+                        <h2 class="text-xl font-bold mb-6 text-slate-100">Pearson Correlation</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mb-6">
+                            <div>
+                                <label class="block text-sm font-semibold mb-2 text-slate-200">Variable 1</label>
+                                <textarea id="corr_x" rows="4" class="w-full border border-slate-300 p-3 rounded-none bg-slate-900 text-slate-200 placeholder-slate-500 font-mono text-sm fade-transition outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2 text-slate-200">Variable 2</label>
+                                <textarea id="corr_y" rows="4" class="w-full border border-slate-300 p-3 rounded-none bg-slate-900 text-slate-200 placeholder-slate-500 font-mono text-sm fade-transition outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+                            </div>
+                        </div>
+                        <button onclick="runAnalysis('correlation')" class="w-full bg-blue-600 text-white font-bold py-4 rounded-none hover:bg-blue-500 transition shadow-md">Find Correlation</button>
+                    </div>
+                    <div id="res_correlation" class="mt-8 hidden bg-slate-800 px-6 md:px-16 py-8 md:py-12 shadow-2xl border-y border-slate-300 rounded-none academic-output">
+                        <div id="correlation_output" class="text-base md:text-lg mb-8 overflow-x-auto text-slate-200"></div>
+                        <div class="w-full flex justify-center">
+                            <img id="correlation_image" src="" alt="Plot" class="result-image">
+                        </div>
+                        <a id="correlation_download" href="#" download="correlation_scatter.png" class="w-full mt-6 block text-center bg-slate-700 text-slate-100 text-sm font-bold py-4 rounded-none font-sans shadow hover:bg-slate-600 transition">Download Chart</a>
+                    </div>
+                </div>
+
+                <div id="error_box" class="mt-4 mx-6 md:mx-16 hidden p-4 bg-red-900/50 text-red-200 border border-red-800 rounded-none text-sm font-bold shadow"></div>
+
+            </div>
+        </main>
+    </div>
+
+<script>
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mobile-overlay');
+
+    function toggleSidebar() {
+        sidebar.classList.toggle('-translate-x-full');
+        overlay.classList.toggle('hidden');
+    }
+
+    const examples = [
+        { xName: 'Inflation rate (%)', yName: 'Consumer spending ($)', xData: '5.0, 6.5, 8.2, 7.1, 9.0', yData: '12000, 14500, 16800, 15500, 18000' },
+        { xName: 'Daily study time (hrs)', yName: 'Exam score', xData: '2, 4, 6, 8, 10', yData: '65, 78, 88, 92, 98' },
+        { xName: 'Weekly exercise (min)', yName: 'Body Mass Index', xData: '0, 60, 120, 180, 240', yData: '32.1, 30.5, 28.2, 26.0, 24.5' },
+        { xName: 'Internet speed (Mbps)', yName: 'Class performance', xData: '10, 25, 50, 100, 200', yData: '50, 65, 80, 90, 95' }
+    ];
+
+    let currentExampleIndex = 0;
+
+    function updatePlaceholderWithFade(elementId, newText) {
+        const el = document.getElementById(elementId);
+        if(!el) return;
+        if(el.value !== "" || document.activeElement === el) return;
+        
+        el.style.opacity = '0';
+        setTimeout(() => {
+            el.placeholder = newText;
+            el.style.opacity = '1';
+        }, 400); 
+    }
+
+    function changePlaceholders() {
+        const ex = examples[currentExampleIndex];
+        updatePlaceholderWithFade('reg_x_name', 'e.g., ' + ex.xName);
+        updatePlaceholderWithFade('reg_x', 'e.g., ' + ex.xData);
+        updatePlaceholderWithFade('reg_y_name', 'e.g., ' + ex.yName);
+        updatePlaceholderWithFade('reg_y', 'e.g., ' + ex.yData);
+        updatePlaceholderWithFade('desc_data', `e.g., ${ex.xName} data:\n${ex.xData}`);
+        updatePlaceholderWithFade('ttest_a', `Group A (e.g., ${ex.xData})`);
+        updatePlaceholderWithFade('ttest_b', `Group B (e.g., ${ex.yData})`);
+        updatePlaceholderWithFade('corr_x', `Variable 1 (${ex.xName})\ne.g., ${ex.xData}`);
+        updatePlaceholderWithFade('corr_y', `Variable 2 (${ex.yName})\ne.g., ${ex.yData}`);
+        currentExampleIndex = (currentExampleIndex + 1) % examples.length;
+    }
+
+    changePlaceholders();
+    setInterval(changePlaceholders, 5000);
+
+    function switchTab(tabId, element) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        element.classList.add('active');
+        document.getElementById('error_box').classList.add('hidden');
+        
+        if(window.innerWidth < 768) {
+            sidebar.classList.add('-translate-x-full');
+            overlay.classList.add('hidden');
+        }
+    }
+
+    function showLoading() { document.getElementById('loading-overlay').style.display = 'flex'; }
+    function hideLoading() { document.getElementById('loading-overlay').style.display = 'none'; }
+
+    async function runAnalysis(type) {
+        const errorBox = document.getElementById('error_box');
+        errorBox.classList.add('hidden');
+        showLoading();
+        
+        let payload = {};
+        if(type === 'regression') {
+            payload = { x_name: document.getElementById('reg_x_name').value, x: document.getElementById('reg_x').value, y_name: document.getElementById('reg_y_name').value, y: document.getElementById('reg_y').value };
+        } else if(type === 'descriptive') {
+            payload = { data: document.getElementById('desc_data').value };
+        } else if(type === 'ttest') {
+            payload = { grup_a: document.getElementById('ttest_a').value, grup_b: document.getElementById('ttest_b').value };
+        } else if(type === 'correlation') {
+            payload = { x: document.getElementById('corr_x').value, y: document.getElementById('corr_y').value };
+        }
+
+        try {
+            const response = await fetch(`/api/${type}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            const result = await response.json();
+            if(!response.ok) throw new Error(result.error || "An unknown error occurred.");
+
+            document.getElementById(`res_${type}`).classList.remove('hidden');
+            
+            if(type === 'regression') {
+                document.getElementById('reg_model_name').innerText = `Recommended Model: ${result.model_name}`;
+                document.getElementById('reg_r2').innerText = `${result.r2_score}%`;
+            } else {
+                let outputHTML = `<table class="w-full text-left border-collapse border-b border-t border-slate-700"><tbody>`;
+                for (const [key, value] of Object.entries(result)) {
+                    if (key !== 'image') {
+                        outputHTML += `
+                        <tr class="border-b border-slate-700 last:border-0 hover:bg-slate-700/50">
+                            <td class="py-4 pr-4 font-bold text-slate-100 w-1/2 md:w-1/3">${key}</td>
+                            <td class="py-4 text-slate-300 break-words">${value}</td>
+                        </tr>`;
+                    }
+                }
+                outputHTML += `</tbody></table>`;
+                document.getElementById(`${type}_output`).innerHTML = outputHTML;
+            }
+
+            if(result.image) {
+                const imgElement = document.getElementById(type === 'regression' ? 'reg_image' : `${type}_image`);
+                const dlElement = document.getElementById(type === 'regression' ? 'reg_download' : `${type}_download`);
+                imgElement.src = `data:image/png;base64,${result.image}`;
+                dlElement.href = `data:image/png;base64,${result.image}`;
+            }
+
+        } catch (error) {
+            errorBox.classList.remove('hidden');
+            errorBox.innerText = `Error: ${error.message}`;
+        } finally {
+            hideLoading();
+        }
+    }
+
+    // --- YENİ EKLENEN KISIM: VERİLERİ HAFIZADA TUTMA (LOCAL STORAGE) ---
+    const inputIdsToSave = ['reg_x_name', 'reg_x', 'reg_y_name', 'reg_y', 'desc_data', 'ttest_a', 'ttest_b', 'corr_x', 'corr_y'];
+
+    window.addEventListener('DOMContentLoaded', () => {
+        inputIdsToSave.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                // Eğer daha önceden kaydedilmiş bir değer varsa kutuyu doldur
+                const savedValue = localStorage.getItem('optimiseit_' + id);
+                if (savedValue) {
+                    el.value = savedValue;
+                }
+
+                // Kullanıcı her yazı yazdığında güncel değeri kaydet
+                el.addEventListener('input', () => {
+                    localStorage.setItem('optimiseit_' + id, el.value);
+                });
+            }
+        });
+    });
+</script>
+
+</body>
+</html>
