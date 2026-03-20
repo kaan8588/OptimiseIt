@@ -42,26 +42,70 @@ def api_regression():
         x_smooth = np.linspace(x.min(), x.max(), 100).reshape(-1, 1)
         models = {}
 
+        # 1. Simple Linear Regression (y = mx + b)
         lin_model = LinearRegression().fit(x, y)
-        models['Simple Linear Regression'] = {'r2': r2_score(y, lin_model.predict(x)), 'plot': lin_model.predict(x_smooth), 'color': '#ef4444'}
+        m = lin_model.coef_[0]
+        b = lin_model.intercept_
+        lin_eq = f"y = {m:.4f}x {'+' if b >= 0 else '-'} {abs(b):.4f}"
+        
+        models['Simple Linear Regression'] = {
+            'r2': r2_score(y, lin_model.predict(x)), 
+            'plot': lin_model.predict(x_smooth), 
+            'color': '#ef4444',
+            'equation': lin_eq
+        }
 
+        # 2. Polynomial Regression (y = ax^2 + bx + c)
         poly = PolynomialFeatures(degree=2)
         poly_model = LinearRegression().fit(poly.fit_transform(x), y)
-        models['Polynomial Regression (2nd Degree)'] = {'r2': r2_score(y, poly_model.predict(poly.transform(x))), 'plot': poly_model.predict(poly.transform(x_smooth)), 'color': '#f59e0b'}
+        c_poly = poly_model.intercept_
+        b_poly = poly_model.coef_[1]
+        a_poly = poly_model.coef_[2]
+        poly_eq = f"y = {a_poly:.4f}x² {'+' if b_poly >= 0 else '-'} {abs(b_poly):.4f}x {'+' if c_poly >= 0 else '-'} {abs(c_poly):.4f}"
+        
+        models['Polynomial Regression (2nd Degree)'] = {
+            'r2': r2_score(y, poly_model.predict(poly.transform(x))), 
+            'plot': poly_model.predict(poly.transform(x_smooth)), 
+            'color': '#f59e0b',
+            'equation': poly_eq
+        }
 
+        # Üstel ve Kuvvet modelleri için pozitiflik kontrolü
         if np.all(x > 0) and np.all(y > 0):
+            # 3. Exponential Growth (y = a * e^(bx))
             p_exp = np.polyfit(x.flatten(), np.log(y), 1)
-            models['Exponential Growth'] = {'r2': r2_score(y, np.exp(p_exp[1]) * np.exp(p_exp[0] * x.flatten())), 'plot': np.exp(p_exp[1]) * np.exp(p_exp[0] * x_smooth.flatten()), 'color': '#10b981'}
+            a_exp = np.exp(p_exp[1])
+            b_exp = p_exp[0]
+            exp_eq = f"y = {a_exp:.4f} * e^({b_exp:.4f}x)"
             
+            models['Exponential Growth'] = {
+                'r2': r2_score(y, a_exp * np.exp(b_exp * x.flatten())), 
+                'plot': a_exp * np.exp(b_exp * x_smooth.flatten()), 
+                'color': '#10b981',
+                'equation': exp_eq
+            }
+            
+            # 4. Power Equation (y = a * x^b)
             p_pow = np.polyfit(np.log10(x.flatten()), np.log10(y), 1)
-            models['Power Equation'] = {'r2': r2_score(y, (10**p_pow[1]) * (x.flatten() ** p_pow[0])), 'plot': (10**p_pow[1]) * (x_smooth.flatten() ** p_pow[0]), 'color': '#8b5cf6'}
+            a_pow = 10**p_pow[1]
+            b_pow = p_pow[0]
+            pow_eq = f"y = {a_pow:.4f} * x^({b_pow:.4f})"
+            
+            models['Power Equation'] = {
+                'r2': r2_score(y, (a_pow) * (x.flatten() ** b_pow)), 
+                'plot': (a_pow) * (x_smooth.flatten() ** b_pow), 
+                'color': '#8b5cf6',
+                'equation': pow_eq
+            }
 
+        # En iyi modeli seçme algoritması
         best_name = max(models, key=lambda k: models[k]['r2'])
         if best_name != 'Simple Linear Regression' and (models[best_name]['r2'] - models['Simple Linear Regression']['r2'] < 0.02):
             best_name = 'Simple Linear Regression'
             
         best_model = models[best_name]
 
+        # Grafik Çizimi
         fig = Figure(figsize=(8, 4.5), dpi=100)
         canvas = FigureCanvas(fig)
         ax = fig.add_subplot(111)
@@ -75,6 +119,7 @@ def api_regression():
         return jsonify({
             "model_name": best_name,
             "r2_score": round(best_model['r2'] * 100, 2),
+            "equation": best_model['equation'],
             "image": fig_to_base64(fig)
         })
     except Exception as e:
